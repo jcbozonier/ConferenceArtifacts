@@ -5,17 +5,17 @@ require "mongo"
 include Mongo
 
 def search_for_altnetseattle page_number, since_id
-  #hashtag = "altnetseattle"
-  hashtag = "tragicmoviedeaths"
+  hashtag = "altnetseattle"
+  #hashtag = "tragicmoviedeaths"
   uri  = URI.parse("http://search.twitter.com/search.json?q=%23#{hashtag}&rpp=100&page=#{page_number}&since_id=#{since_id}")
   response = Net::HTTP.get_response(uri)
-
-  if response.body.length > 375
-    puts "Received a good response of length #{response.body.length}"
-    yield JSON.parse response.body
+  result = JSON.parse response.body
+  if result["results"].length > 0
+    puts "Received a good response with #{result["results"].length} tweets."
+    yield result 
     true
   else
-    puts "Received an empty response of length #{response.body.length}"
+    puts "Received a bad response with #{result["results"].length} tweets."
     false
   end
 end
