@@ -28,18 +28,37 @@ def every_minute
   end
 end
 
+def current_max_id_in_archived_tweets
+  connection_string = "flame.mongohq.com"
+  mongo_connection = Mongo::Connection.new(connection_string, 27018)
+  db = mongo_connection.db("AltNetMiner")
+  if db.authenticate("darkxanthos", "abc123!")
+    test_collection = db.collection('AltNetSeattleMentions')
+    tweets = test_collection.find({}).sort([["id", -1]]).limit(1).select{|tweet| tweet}
+
+    if tweets.length > 0
+      most_recent_archived_tweet = tweets[0]
+      return most_recent_archived_tweet["id_str"]
+    else
+      return "0"
+    end
+  end
+
+  raise "Log in to Mongo FAILED!"
+end
+
 def save_to_datastore twitter_response
   connection_string = "flame.mongohq.com"
-    mongo_connection = Mongo::Connection.new(connection_string, 27018)
-    db = mongo_connection.db("AltNetMiner")
-    if db.authenticate("darkxanthos", "abc123!")
-      test_collection = db.collection('AltNetSeattleMentions')
+  mongo_connection = Mongo::Connection.new(connection_string, 27018)
+  db = mongo_connection.db("AltNetMiner")
+  if db.authenticate("darkxanthos", "abc123!")
+    test_collection = db.collection('AltNetSeattleMentions')
 
-      twitter_response["results"].each do |result|
-        test_collection.insert result
-      end
+    twitter_response["results"].each do |result|
+      test_collection.insert result
     end
-    mongo_connection.close
+  end
+  mongo_connection.close
 end
 
 def warn_of_duplicates_between previous_tweet_ids, result_ids
@@ -50,11 +69,11 @@ end
 
 previous_tweet_ids = []
 
-previous_max_id = "0"
+previous_max_id = current_max_id_in_archived_tweets
 twitter_max_id = previous_max_id
 
 every_minute do
-  puts "Checking for new messages"
+  puts "Checking for new messages since id #{previous_max_id}"
 
   for page_number in 1..15
     puts "Looking at page #{page_number}"
