@@ -12,7 +12,7 @@ def search_for_altnetseattle page_number, since_id
   result = JSON.parse response.body
   if result["results"].length > 0
     puts "Received a good response with #{result["results"].length} tweets."
-    yield result 
+    yield result
     true
   else
     puts "Received a bad response with #{result["results"].length} tweets."
@@ -61,14 +61,6 @@ def save_to_datastore twitter_response
   mongo_connection.close
 end
 
-def warn_of_duplicates_between previous_tweet_ids, result_ids
-  result_ids.each do |result_id|
-    puts "DUPE Found!" if previous_tweet_ids.include? result_id
-  end
-end
-
-previous_tweet_ids = []
-
 previous_max_id = current_max_id_in_archived_tweets
 twitter_max_id = previous_max_id
 
@@ -80,14 +72,7 @@ every_minute do
     any_results = search_for_altnetseattle page_number, previous_max_id do |twitter_response|
       puts "Found results on page #{page_number}"
 
-      result_ids = twitter_response["results"].select{|result| result["id_str"]}
-
       twitter_max_id = twitter_response["max_id_str"]
-
-      warn_of_duplicates_between previous_tweet_ids, result_ids
-      result_ids.each do |result_id|
-        previous_tweet_ids << result_id
-      end
 
       puts "Saving twitter results to datastore"
       save_to_datastore twitter_response
