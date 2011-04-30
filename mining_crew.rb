@@ -10,12 +10,13 @@ def search_for_altnetseattle page_number, since_id
   uri  = URI.parse("http://search.twitter.com/search.json?q=%23#{hashtag}&rpp=100&page=#{page_number}&since_id=#{since_id}")
   response = Net::HTTP.get_response(uri)
   result = JSON.parse response.body
-  if result["results"].length > 0
-    puts "Received a good response with #{result["results"].length} tweets."
+  tweet_count = result["results"].length
+  puts "Found #{tweet_count} tweets on page #{page_number}."
+  
+  if tweet_count > 0
     yield result 
     true
   else
-    puts "Received a bad response with #{result["results"].length} tweets."
     false
   end
 end
@@ -98,6 +99,4 @@ every_minute do
       break
     end
   end
-
-  previous_max_id = twitter_max_id
 end
