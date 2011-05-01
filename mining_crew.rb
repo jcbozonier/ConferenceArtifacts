@@ -62,18 +62,20 @@ def save_to_datastore twitter_response
   mongo_connection.close
 end
 
-previous_max_id = current_max_id_in_archived_tweets
-twitter_max_id = previous_max_id
+twitter_max_id = current_max_id_in_archived_tweets
 
 every_minute do
-  puts "Checking for new messages since id #{previous_max_id}"
+  puts "Checking for new messages since id #{twitter_max_id}"
 
   for page_number in 1..15
     puts "Looking at page #{page_number}"
-    any_results = search_for_altnetseattle page_number, previous_max_id do |twitter_response|
+    any_results = search_for_altnetseattle page_number, twitter_max_id do |twitter_response|
       puts "Found results on page #{page_number}"
 
-      twitter_max_id = twitter_response["max_id_str"]
+      if page_number == 1
+        twitter_max_id = twitter_response["max_id_str"]
+        puts "Set twitter_max_id to #{twitter_max_id}"
+      end
 
       puts "Saving twitter results to datastore"
       save_to_datastore twitter_response
@@ -84,4 +86,6 @@ every_minute do
       break
     end
   end
+
+
 end
