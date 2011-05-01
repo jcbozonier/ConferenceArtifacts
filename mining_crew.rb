@@ -44,6 +44,7 @@ class Database
 
     raise "Log in to Mongo FAILED!"
   end
+  mongo_connection.close
 end
 
 class Twitter
