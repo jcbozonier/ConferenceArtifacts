@@ -4,20 +4,25 @@ require "json"
 require "mongo"
 include Mongo
 
-def search_for_altnetseattle page_number, since_id
-  hashtag = "altnetseattle"
-  uri  = URI.parse("http://search.twitter.com/search.json?q=%23#{hashtag}&rpp=100&page=#{page_number}&since_id=#{since_id}")
-  response = Net::HTTP.get_response(uri)
-  result = JSON.parse response.body
+def search_for hashtag
+  twitter_max_id = current_max_id_in_archived_tweets
+  puts "Searching for all tweets since id #{twitter_max_id}"
 
-  tweet_count = result["results"].length
-  puts "Found #{tweet_count} tweets on page #{page_number}."
+  for page_number in 1..15
+    uri  = URI.parse("http://search.twitter.com/search.json?q=%23#{hashtag}&rpp=100&page=#{page_number}&since_id=#{twitter_max_id}")
+    response = Net::HTTP.get_response(uri)
+    result = JSON.parse response.body
 
-  if tweet_count > 0
-    yield result
-    true
-  else
-    false
+    tweet_count = result["results"].length
+    puts "Found #{tweet_count} tweets on page #{page_number}."
+
+    if tweet_count > 0
+      puts "Found results on page #{page_number}"
+      yield result
+    else
+      puts "No search results"
+      break
+    end
   end
 end
 
@@ -62,30 +67,9 @@ def save_to_datastore twitter_response
   mongo_connection.close
 end
 
-twitter_max_id = current_max_id_in_archived_tweets
-
 every_minute do
-  puts "Checking for new messages since id #{twitter_max_id}"
-
-  for page_number in 1..15
-    puts "Looking at page #{page_number}"
-    any_results = search_for_altnetseattle page_number, twitter_max_id do |twitter_response|
-      puts "Found results on page #{page_number}"
-
-      if page_number == 1
-        twitter_max_id = twitter_response["max_id_str"]
-        puts "Set twitter_max_id to #{twitter_max_id}"
-      end
-
-      puts "Saving twitter results to datastore"
-      save_to_datastore twitter_response
-    end
-
-    if not any_results
-      puts "No search results"
-      break
-    end
+  search_for "altnetseattle" do |twitter_response|
+    puts "Saving twitter results to datastore"
+    save_to_datastore twitter_response
   end
-
-
 end
