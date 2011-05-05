@@ -4,6 +4,8 @@ require "json"
 require "mongo"
 include Mongo
 
+require Dir.pwd + '/search_tweet.rb'
+
 def every_minute
   loop do
     yield
@@ -13,15 +15,14 @@ def every_minute
 end
 
 class Database
-  def save tweets
+  def add_tweet_events_for tweets
     connection_string = "flame.mongohq.com"
     mongo_connection = Mongo::Connection.new(connection_string, 27018)
     db = mongo_connection.db("AltNetMiner")
     if db.authenticate("darkxanthos", "abc123!")
       test_collection = db.collection('AltNetSeattleMentions')
-      tweets.each do |tweet|
-        test_collection.insert tweet
-      end
+
+      test_collection.insert tweets
     end
     mongo_connection.close
   end
@@ -44,6 +45,51 @@ class Database
 
     mongo_connection.close
     raise "Log in to Mongo FAILED!"
+  end
+
+  def save_conversation graphs
+    puts "saving conversation graphs"
+
+    connection_string = "flame.mongohq.com"
+    mongo_connection = Mongo::Connection.new(connection_string, 27018)
+    db = mongo_connection.db("AltNetMiner")
+
+    if db.authenticate("darkxanthos", "abc123!")
+      test_collection = db.collection('AltNetSeattleDiscussions')
+      migrate_existing_tweet_conversations if test_collection.find({}).count() == 0
+
+      test_collection = db.collection('AltNetSeattleDiscussions')
+
+      puts "Inserting conversations into Mongo"
+      test_collection.insert graphs
+      puts "Done inserting conversations into Mongo"
+    end
+
+    mongo_connection.close
+  end
+
+  def migrate_existing_tweet_conversations
+    puts "Migrating preexisting conversations"
+    connection_string = "flame.mongohq.com"
+    mongo_connection = Mongo::Connection.new(connection_string, 27018)
+    db = mongo_connection.db("AltNetMiner")
+    if db.authenticate("darkxanthos", "abc123!")
+      test_collection = db['AltNetSeattleMentions']
+      tweets = db['AltNetSeattleMentions'].find({}).select{|tweet| tweet}
+
+      puts "Computing all graphs"
+      graphs = []
+      tweets.each do |tweet|
+        graphs << SearchTweet.conversation_graph(tweet)
+      end
+      puts "Completed computing all graphs"
+
+      puts "Saving migration"
+      discussion_graphs = db.collection('AltNetSeattleDiscussions')
+      discussion_graphs.insert graphs
+      puts "Migration saved"
+    end
+    mongo_connection.close
   end
 end
 
@@ -76,8 +122,16 @@ database = Database.new
 
 every_minute do
   twitter.search_for "altnetseattle", database.last_tweet_id_received do |tweets|
+
+    puts "Parsing conversation graphs"
+    graphs = []
+    tweets.each do |tweet|
+      graphs << SearchTweet.conversation_graph(tweet)
+    end
+
     puts "Saving twitter results to datastore"
-    database.save tweets
+    database.save_conversation graphs
+    database.add_tweet_events_for tweets
   end
 end
 
