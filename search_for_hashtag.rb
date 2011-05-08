@@ -68,6 +68,51 @@ class Database
     mongo_connection.close
   end
 
+  def merge tweets
+    puts "connecting to db"
+    connection_string = "flame.mongohq.com"
+    mongo_connection = Mongo::Connection.new(connection_string, 27018)
+    db = mongo_connection.db("AltNetMiner")
+
+    if db.authenticate("darkxanthos", "abc123!")
+      puts "creating word relationships"
+      test_collection = db.collection('AltNetSeattleWordConnections')
+      migrate_existing_tweets_to_word_relationships if test_collection.find({}).count() == 0
+
+      archived_relationships = test_collection.find({})
+      combined_relationships = tweets.inject(archived_relationships) do |accum, tweet|
+          combine_relationships(accum, relate_words_in(tweet["text"]))
+      end
+
+      test_collection.remove({})
+      test_collection.insert(combined_relationships)
+    end
+
+    mongo_connection.close
+
+    puts "done creating word relationships"
+  end
+
+  def migrate_existing_tweets_to_word_relationships
+    puts "migrating word relationships"
+    connection_string = "flame.mongohq.com"
+    mongo_connection = Mongo::Connection.new(connection_string, 27018)
+    db = mongo_connection.db("AltNetMiner")
+
+    if db.authenticate("darkxanthos", "abc123!")
+      word_connections = db.collection('AltNetSeattleWordConnections')
+
+      tweets = db['AltNetSeattleMentions']
+
+      word_relationships = tweets.find({}).map{|tweet| relate_words_in tweet["text"]}.inject([]){|accum, relationship| combine_relationships relationship, accum}
+
+      word_connections.insert word_relationships
+    end
+
+    mongo_connection.close
+    puts "done migrating word relationships"
+  end
+
   def migrate_existing_tweet_conversations
     puts "Migrating preexisting conversations"
     connection_string = "flame.mongohq.com"
@@ -130,6 +175,7 @@ every_minute do
     end
 
     puts "Saving twitter results to datastore"
+    database.merge tweets
     database.save_conversation graphs
     database.add_tweet_events_for tweets
   end

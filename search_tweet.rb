@@ -1,4 +1,5 @@
 require "time"
+
 class SearchTweet
   def self.users_referenced_in tweet
     referenced_users = [tweet['from_user']]
@@ -34,26 +35,22 @@ class SearchTweet
   end
 end
 
-def relate_words_in text
-  relationships = []
-  for_each_word_in text do |word|
-    relationships << {"word"=>word, "count"=>1,"related_to" => []}
-  end
-
-  for_each_word_in text do |word|
-    relationships.each do |relationship|
-      if word != relationship["word"]
-        relationship["related_to"] << word
-      end
-    end
-  end
-
-  relationships
-end
 
 class Array
   def histogram
     self.group_by{|x|x}.map{|w,ws| {w => ws.count}}
+  end
+end
+
+def relate_words_in text
+  words = words_in text
+
+  words.group_by{|x|x}.map do |word, word_list|
+    {
+      "word" => word,
+      "count" => word_list.length,
+      "related_to" => words.uniq.select{|text_word| word != text_word}
+    }
   end
 end
 
@@ -62,13 +59,20 @@ def combine_relationships this_one, that_one
   histogram = (this_one.map{|x|x["word"]} + that_one.map{|x|x["word"]}).histogram
 
   histogram.map do |wc|
-    {"word" => wc.keys.first, "count" => wc.values.first, "related_to" => related_words[wc.keys.first]}
+    {
+      "word" => wc.keys.first,
+      "count" => wc.values.first,
+      "related_to" => related_words[wc.keys.first]
+    }
   end
 end
 
 def combine_related_words(*args)
   args.inject(Hash.new([])) { |accum, words|
-    words.inject(accum) { |acc, w| accum[w["word"]] = (accum[w["word"]] + w["related_to"]).uniq; accum}
+    words.inject(accum) do |acc, w|
+      accum[w["word"]] = (accum[w["word"]] + w["related_to"]).uniq
+      accum
+    end
   }
 end
 
@@ -80,5 +84,9 @@ def find_related word, this_one, that_one
 end
 
 def for_each_word_in text
-  text.split(/[.: "?,\\]/).each{|w| yield w}
+  (words_in text).each{|w| yield w}
+end
+
+def words_in text
+  text.split(/[.: "?,\\]/).select{|x| x != ""}
 end
